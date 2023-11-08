@@ -159,8 +159,9 @@ def create_new_sprint(project_id, team_id, team_name, last_iteration_finish_date
     r_iter = s.post(iter_url,
                     timeout=int(os.environ["HTTP_TIMEOUT"]), headers=headers, data=json.dumps(iter_req))
 
-    print(json.dumps(iter_req, indent=4))
-    print(json.dumps(r_iter.json(), indent=4))
+    print(
+        f"Sprint created: {cn_req['name']} | {cn_req['attributes']['startDate']}-{cn_req['attributes']['finishDate']}")
+
     return
 
 
@@ -179,7 +180,7 @@ if __name__ == "__main__":
         for team in project["teams"]:
             team_id = team["id"]
             team_name = team["name"]
-            
+
             if (team["last_iteration"] is not None):
                 last_iteration_finish_date = datetime.datetime.strptime(
                     team["last_iteration"]["finishDate"], "%Y-%m-%dT%H:%M:%SZ")
@@ -192,9 +193,6 @@ if __name__ == "__main__":
                     last_iteration_num = int(
                         last_iteration_name.split(" ")[-1])
 
-                    print(
-                        f"team: {team['name']} | iter: {team['last_iteration']['name']} | {last_iteration_num} | time_difference: {time_difference}")
-
                     create_new_sprint(
                         project_id, team_id, team_name, last_iteration_finish_date, last_iteration_num, project_sprint_length)
             else:
@@ -203,12 +201,8 @@ if __name__ == "__main__":
                 last_iteration_finish_date = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
                 last_iteration_num = 0
 
-                print(f"team: {team['name']} | time_difference: {None}")
-
                 create_new_sprint(
                     project_id, team_id, team_name, last_iteration_finish_date, last_iteration_num, project_sprint_length)
-                    
-    # print(json.dumps(filtered_projects, indent=4))
 
     end_time = time.time()
     execution_time = end_time - start_time
