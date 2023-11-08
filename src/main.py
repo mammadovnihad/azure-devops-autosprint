@@ -21,7 +21,7 @@ def handle_paginated_results(url_segment, handler_func):
     results = []
 
     while count == top or req_no == 1:
-        url = f"{BASE_URL}{url_segment}{'?' if '?' not in url_segment else '&'}$top={top}&$skip={skip}&api-version=7.2-preview.3"
+        url = f"{BASE_URL}{url_segment}{'?' if '?' not in url_segment else '&'}$top={top}&$skip={skip}&api-version=7.2-preview.1"
 
         r = s.get(url,
                   timeout=int(os.environ["HTTP_TIMEOUT"]))
@@ -29,7 +29,9 @@ def handle_paginated_results(url_segment, handler_func):
 
         data = body["value"]
 
-        results.extend(handler_func(data))
+        result = handler_func(data)
+        if result is not None:
+            results.extend(result)
 
         count = body["count"]
         skip = skip + top
@@ -46,6 +48,16 @@ def get_teams_by_projects_handler(teams):
         team_ids.append(id)
 
     return team_ids
+
+
+def get_last_iteration_by_teams_handler(iterations):
+    if iterations:
+        last_iteration = [iterations[-1]]
+    else:
+        last_iteration = None
+
+    return last_iteration
+
 
 def extract_number_from_tag(tag):
     # Use a regular expression to find and extract the number part
@@ -72,8 +84,27 @@ def get_active_projs_handler(projects):
             team_ids = handle_paginated_results(
                 f"/_apis/projects/{project_id}/teams", get_teams_by_projects_handler)
 
+            teams = []
+            for team_id in team_ids:
+                last_iteration_list = handle_paginated_results(
+                    f"/{project_id}/{team_id}/_apis/work/teamsettings/iterations", get_last_iteration_by_teams_handler)
+
+                last_iteration = None
+                if last_iteration_list:
+                    last_iteration = last_iteration_list[0]
+                else:
+                    last_iteration = None
+
+                teams.append({"id": team_id,
+                              "last_iteration": {
+                                  "id": last_iteration["id"],
+                                  "name": last_iteration["name"],
+                                  "startDate": last_iteration["attributes"]["startDate"],
+                                  "finishDate": last_iteration["attributes"]["finishDate"]
+                              } if last_iteration is not None else None})
+
             active_projs.append(
-                {"id": project_id, "name": name, "sprint_length": sprint_length, "team_ids": team_ids})
+                {"id": project_id, "name": name, "sprint_length": sprint_length, "teams": teams})
 
     return active_projs
 
