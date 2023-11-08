@@ -1,3 +1,4 @@
+import datetime
 import json
 import re
 import time
@@ -114,15 +115,102 @@ def get_active_projs_handler(projects):
     return active_projs
 
 
+def find_next_workday():
+    current_date = datetime.datetime.now()
+    while True:
+        # Increment the current date by one day
+        current_date += datetime.timedelta(days=1)
+
+        # Check if the day of the week is not a weekend (Monday to Friday)
+        if current_date.weekday() < 5:
+            return current_date
+
+
+def create_new_sprint(project_id, team_id, team_name, last_iteration_finish_date, last_iteration_num, sprint_length):
+    new_sprint_name = f"Iteration {last_iteration_num + 1}"
+    new_sprint_startDate = find_next_workday()
+    new_sprint_finishDate = new_sprint_startDate + \
+        datetime.timedelta(days=sprint_length)
+
+    cn_req = {
+        "name": f"{team_name} {new_sprint_name}",
+        "attributes": {
+            "startDate": new_sprint_startDate.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            "finishDate": new_sprint_finishDate.strftime('%Y-%m-%dT%H:%M:%SZ')
+        }
+    }
+
+    headers = {'Content-Type': 'application/json'}
+
+    cn_url = f"{BASE_URL}/{project_id}/_apis/wit/classificationnodes/iterations?api-version=7.1-preview.2"
+    r_cn = s.post(cn_url,
+                  timeout=int(os.environ["HTTP_TIMEOUT"]), headers=headers, data=json.dumps(cn_req))
+
+    # TODO Separate iteration request
+    cn_data = r_cn.json()
+
+    new_iteration_id = cn_data["identifier"]
+
+    iter_req = {
+        "id": new_iteration_id,
+    }
+
+    iter_url = f"{BASE_URL}/{project_id}/{team_id}/_apis/work/teamsettings/iterations?api-version=7.2-preview.1"
+    r_iter = s.post(iter_url,
+                    timeout=int(os.environ["HTTP_TIMEOUT"]), headers=headers, data=json.dumps(iter_req))
+
+    print(json.dumps(iter_req, indent=4))
+    print(json.dumps(r_iter.json(), indent=4))
+    return
+
+
 if __name__ == "__main__":
     start_time = time.time()
 
     active_projs = handle_paginated_results(
         "/_apis/projects", get_active_projs_handler)
 
-    print(json.dumps(active_projs, indent=4))
+    filtered_projects = []
+
+    for project in active_projs:
+        project_id = project["id"]
+        project_sprint_length = project["sprint_length"]
+
+        for team in project["teams"]:
+            team_id = team["id"]
+            team_name = team["name"]
+            
+            if (team["last_iteration"] is not None):
+                last_iteration_finish_date = datetime.datetime.strptime(
+                    team["last_iteration"]["finishDate"], "%Y-%m-%dT%H:%M:%SZ")
+                time_difference = last_iteration_finish_date - datetime.datetime.now()
+
+                if time_difference <= datetime.timedelta(days=1):
+                    filtered_projects.append(project)
+
+                    last_iteration_name: str = team["last_iteration"]["name"]
+                    last_iteration_num = int(
+                        last_iteration_name.split(" ")[-1])
+
+                    print(
+                        f"team: {team['name']} | iter: {team['last_iteration']['name']} | {last_iteration_num} | time_difference: {time_difference}")
+
+                    create_new_sprint(
+                        project_id, team_id, team_name, last_iteration_finish_date, last_iteration_num, project_sprint_length)
+            else:
+                filtered_projects.append(project)
+
+                last_iteration_finish_date = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+                last_iteration_num = 0
+
+                print(f"team: {team['name']} | time_difference: {None}")
+
+                create_new_sprint(
+                    project_id, team_id, team_name, last_iteration_finish_date, last_iteration_num, project_sprint_length)
+                    
+    # print(json.dumps(filtered_projects, indent=4))
 
     end_time = time.time()
     execution_time = end_time - start_time
 
-    print(f"Execution time: {execution_time:.5f} seconds")
+    print(f"\nExecution time: {execution_time:.5f} seconds")
