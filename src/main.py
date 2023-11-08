@@ -13,6 +13,7 @@ BASE_URL = F"https://dev.azure.com/{os.environ['ORGANIZATION']}"
 s = requests.Session()
 s.auth = HTTPBasicAuth("", os.environ["PAT"])
 
+
 def handle_paginated_results(url_segment, handler_func):
     count = 1
     top = 10
@@ -39,13 +40,15 @@ def handle_paginated_results(url_segment, handler_func):
 
     return results
 
+
 def get_teams_by_projects_handler(teams):
     team_ids = []
 
     for team in teams:
         id: str = team.get("id")
+        name: str = team.get("name")
 
-        team_ids.append(id)
+        team_ids.append({"id": id, "name": name})
 
     return team_ids
 
@@ -70,6 +73,7 @@ def extract_number_from_tag(tag):
         # Return default (7) if no match is found
         return 7
 
+
 def get_active_projs_handler(projects):
     active_projs = []
 
@@ -81,13 +85,13 @@ def get_active_projs_handler(projects):
             name: str = proj.get("name")
             sprint_length = extract_number_from_tag(description)
 
-            team_ids = handle_paginated_results(
+            teams_list = handle_paginated_results(
                 f"/_apis/projects/{project_id}/teams", get_teams_by_projects_handler)
 
             teams = []
-            for team_id in team_ids:
+            for team in teams_list:
                 last_iteration_list = handle_paginated_results(
-                    f"/{project_id}/{team_id}/_apis/work/teamsettings/iterations", get_last_iteration_by_teams_handler)
+                    f"/{project_id}/{team['id']}/_apis/work/teamsettings/iterations", get_last_iteration_by_teams_handler)
 
                 last_iteration = None
                 if last_iteration_list:
@@ -95,18 +99,20 @@ def get_active_projs_handler(projects):
                 else:
                     last_iteration = None
 
-                teams.append({"id": team_id,
+                teams.append({"id": team["id"],
+                              "name": team["name"],
                               "last_iteration": {
                                   "id": last_iteration["id"],
                                   "name": last_iteration["name"],
                                   "startDate": last_iteration["attributes"]["startDate"],
                                   "finishDate": last_iteration["attributes"]["finishDate"]
-                              } if last_iteration is not None else None})
+                } if last_iteration is not None else None})
 
             active_projs.append(
                 {"id": project_id, "name": name, "sprint_length": sprint_length, "teams": teams})
 
     return active_projs
+
 
 if __name__ == "__main__":
     start_time = time.time()
