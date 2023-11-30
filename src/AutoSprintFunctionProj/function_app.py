@@ -129,7 +129,7 @@ def create_new_sprint(project_id, project_name, team_id, team_name, last_iterati
     new_sprint_name = f"Iteration {last_iteration_num + 1}"
     new_sprint_startDate = find_next_workday()
     new_sprint_finishDate = new_sprint_startDate + \
-        datetime.timedelta(days=sprint_length)
+        datetime.timedelta(days=(sprint_length - 1))
 
     cn_req = {
         "name": f"{team_name} {new_sprint_name}",
@@ -162,6 +162,7 @@ def create_new_sprint(project_id, project_name, team_id, team_name, last_iterati
         f"[AutoSprint] Sprint created: {project_name} | {cn_req['name']} | {cn_req['attributes']['startDate']}-{cn_req['attributes']['finishDate']}")
 
     return
+
 
 def main():
     start_time = time.time()
@@ -209,6 +210,7 @@ def main():
 
     logging.info(f"[AutoSprint] Execution time: {execution_time:.5f} seconds")
 
+
 app = func.FunctionApp()
 
 # @app.function_name(name="HttpTrigger")
@@ -225,7 +227,7 @@ def sprint_checker(myTimer: func.TimerRequest) -> None:
 
     if myTimer.past_due:
         logging.info('The timer is past due!')
-        
+
     main()
 
     logging.info('Python timer trigger function executed.')

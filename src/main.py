@@ -130,7 +130,7 @@ def create_new_sprint(project_id, team_id, team_name, last_iteration_finish_date
     new_sprint_name = f"Iteration {last_iteration_num + 1}"
     new_sprint_startDate = find_next_workday()
     new_sprint_finishDate = new_sprint_startDate + \
-        datetime.timedelta(days=sprint_length)
+        datetime.timedelta(days=(sprint_length - 1))
 
     cn_req = {
         "name": f"{team_name} {new_sprint_name}",
